@@ -14,38 +14,58 @@ export default function Sonhos() {
   const [lucroMensal, setLucroMensal] = useState<number>(2900); // Fallback base
   const [sonhos, setSonhos] = useState<Sonho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form State
   const [nome, setNome] = useState('');
   const [valor, setValor] = useState('');
 
   useEffect(() => {
-    fetchProfile();
+    fetchData();
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // 1. Buscar Receita Mensal para calcular o lucro base
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('receita_mensal')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
-      if (data && data.receita_mensal) {
-        // Here we could calculate a true "lucro" (profit) by subtracting expenses,
-        // but for now we'll use the income or a percentage of it as the base.
-        // Let's assume the user can save 20% of their income by default, or just use the income for the math.
-        // For the sake of the simulation, we'll use a portion of the income or just the income itself.
-        // Let's use 20% of the income as the default "lucro mensal" available for dreams.
-        setLucroMensal(data.receita_mensal * 0.2);
+      if (profileError) {
+        console.error('Erro ao buscar perfil:', profileError);
+      }
+
+      if (profileData && profileData.receita_mensal) {
+        // Assume 20% of income as default savings capacity for the simulation
+        setLucroMensal(profileData.receita_mensal * 0.2);
+      }
+
+      // 2. Buscar Sonhos
+      const { data: sonhosData, error: sonhosError } = await supabase
+        .from('sonhos_metas')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (sonhosError) throw sonhosError;
+
+      if (sonhosData) {
+        const formattedSonhos: Sonho[] = sonhosData.map((item: any) => ({
+          id: item.id.toString(),
+          nome: item.nome_sonho,
+          valorTotal: Number(item.valor_alvo),
+          economiaDiaria: 0, // Slider starts at 0
+        }));
+        setSonhos(formattedSonhos);
       }
     } catch (error) {
-      console.error('Erro ao buscar perfil:', error);
+      console.error('Erro ao buscar dados:', error);
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +75,7 @@ export default function Sonhos() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const handleAddSonho = (e: React.FormEvent) => {
+  const handleAddSonho = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !valor) return;
 
@@ -64,20 +84,58 @@ export default function Sonhos() {
     
     if (isNaN(numericValue) || numericValue <= 0) return;
 
-    const newSonho: Sonho = {
-      id: Date.now().toString(),
-      nome: nome.trim(),
-      valorTotal: numericValue,
-      economiaDiaria: 0,
-    };
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
-    setSonhos([newSonho, ...sonhos]);
-    setNome('');
-    setValor('');
+      const { data, error } = await supabase
+        .from('sonhos_metas')
+        .insert([
+          { 
+            nome_sonho: nome.trim(), 
+            valor_alvo: numericValue,
+            user_id: user.id
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newSonho: Sonho = {
+          id: data.id.toString(),
+          nome: data.nome_sonho,
+          valorTotal: Number(data.valor_alvo),
+          economiaDiaria: 0,
+        };
+        setSonhos([newSonho, ...sonhos]);
+        setNome('');
+        setValor('');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar sonho:', error);
+      alert('Erro ao salvar o sonho.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRemoveSonho = (id: string) => {
-    setSonhos(sonhos.filter(s => s.id !== id));
+  const handleRemoveSonho = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('sonhos_metas')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSonhos(sonhos.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Erro ao remover sonho:', error);
+      alert('Erro ao remover o sonho.');
+    }
   };
 
   const handleSliderChange = (id: string, value: number) => {
@@ -128,10 +186,14 @@ export default function Sonhos() {
 
           <button
             type="submit"
-            disabled={!nome.trim() || !valor}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-black font-bold py-4 rounded-xl transition-colors mt-2"
+            disabled={!nome.trim() || !valor || isSubmitting}
+            className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-black font-bold py-4 rounded-xl transition-colors mt-2 flex items-center justify-center"
           >
-            Simular Conquista
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+            ) : (
+              'Simular Conquista'
+            )}
           </button>
         </form>
       </section>
