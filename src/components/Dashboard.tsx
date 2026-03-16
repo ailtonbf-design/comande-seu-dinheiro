@@ -103,8 +103,13 @@ export default function Dashboard() {
     <div className="max-w-md mx-auto min-h-screen flex flex-col pt-6 pb-24 px-6 space-y-8">
       {/* Header */}
       <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[10px] font-bold tracking-widest text-yellow-500 uppercase mb-1">Comande Seu Dinheiro</h1>
+        <div className="space-y-2">
+          <img 
+            src="https://williampaganelli.com.br/comande-seu-dinheiro/wp-content/uploads/2024/08/Group-3-2.webp" 
+            alt="Comande Seu Dinheiro Logo" 
+            className="h-6 w-auto"
+            referrerPolicy="no-referrer"
+          />
           <h2 className="text-2xl font-semibold text-white">Olá, {userName}</h2>
         </div>
         <div className="w-12 h-12 rounded-full border-2 border-zinc-800 bg-zinc-900 flex items-center justify-center text-yellow-500 font-bold uppercase">

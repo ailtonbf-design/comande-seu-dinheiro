@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -42,9 +42,13 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-black flex flex-col justify-center items-center p-6 text-white font-sans selection:bg-yellow-500/30">
       <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <ShieldCheck className="w-12 h-12 text-yellow-500 mx-auto" />
-          <h1 className="text-3xl font-bold text-yellow-500 uppercase tracking-wider">Comande Seu Dinheiro</h1>
+        <div className="text-center space-y-4 flex flex-col items-center">
+          <img 
+            src="https://williampaganelli.com.br/comande-seu-dinheiro/wp-content/uploads/2024/08/Group-3-2.webp" 
+            alt="Comande Seu Dinheiro Logo" 
+            className="w-48 h-auto mx-auto"
+            referrerPolicy="no-referrer"
+          />
           <p className="text-zinc-400">Assuma o controle do seu futuro financeiro.</p>
         </div>
 
