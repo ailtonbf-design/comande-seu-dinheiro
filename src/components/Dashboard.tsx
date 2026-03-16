@@ -40,17 +40,18 @@ export default function Dashboard() {
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'Usuário');
 
       // 1. Receita Mensal
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('receita_mensal, full_name')
+        .select('receita_mensal')
         .eq('id', user.id)
         .maybeSingle();
 
+      if (profileError) {
+        console.error('Erro ao buscar perfil:', profileError);
+      }
+
       if (profileData) {
-        setReceitaTotal(profileData.receita_mensal || 0);
-        if (profileData.full_name) {
-          setUserName(profileData.full_name.split(' ')[0]);
-        }
+        setReceitaTotal(Number(profileData.receita_mensal) || 0);
       }
 
       // 2. Ralos Invisíveis
