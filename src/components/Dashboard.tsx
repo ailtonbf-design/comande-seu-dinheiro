@@ -76,6 +76,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       const { error } = await supabase.from('transacoes').insert({
         user_id: user.id,
         nome: formData.nome,
+        descricao: formData.nome, // Added to satisfy existing not-null constraint
         valor: valorNum,
         tipo: modalType,
         is_ralo: modalType === 'despesa' ? formData.isRalo : false
