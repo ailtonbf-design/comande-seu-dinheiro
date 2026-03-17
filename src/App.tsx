@@ -8,6 +8,7 @@ import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import Dashboard from './components/Dashboard';
 import BottomNav from './components/BottomNav';
+import Extrato from './components/Extrato';
 import Sonhos from './components/Sonhos';
 import Auth from './components/Auth';
 import Config from './components/Config';
@@ -83,6 +84,7 @@ export default function App() {
   return (
     <div className="bg-black min-h-screen text-white font-sans pb-20 selection:bg-yellow-500/30">
       {activeTab === 'home' && <Dashboard setActiveTab={setActiveTab} />}
+      {activeTab === 'extrato' && <Extrato />}
       {activeTab === 'sonhos' && <Sonhos />}
       {activeTab === 'config' && <Config />}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />

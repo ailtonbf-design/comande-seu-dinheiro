@@ -1,4 +1,4 @@
-import { Home, Star, Settings } from 'lucide-react';
+import { Home, ScrollText, Star, Settings } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 interface BottomNavProps {
@@ -9,6 +9,7 @@ interface BottomNavProps {
 export default function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
   const navItems = [
     { id: 'home', icon: Home, label: 'Raio-X' },
+    { id: 'extrato', icon: ScrollText, label: 'Extrato' },
     { id: 'sonhos', icon: Star, label: 'Sonhos' },
     { id: 'config', icon: Settings, label: 'Ajustes' },
   ];
@@ -24,7 +25,7 @@ export default function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className="flex flex-col items-center justify-center w-20 h-full space-y-1 relative"
+              className="flex flex-col items-center justify-center flex-1 h-full space-y-1 relative"
             >
               {isActive && (
                 <div className="absolute top-0 w-8 h-1 bg-yellow-500 rounded-b-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
