@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('Usuário');
   const [receitaTotal, setReceitaTotal] = useState(0);
   const [totalRalos, setTotalRalos] = useState(0);
+  const [perfilFinanceiro, setPerfilFinanceiro] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [provisionadas] = useState(mockProvisionadas);
@@ -39,10 +40,10 @@ export default function Dashboard() {
 
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'Usuário');
 
-      // 1. Receita Mensal
+      // 1. Receita Mensal e Perfil
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('receita_mensal')
+        .select('receita_mensal, perfil_financeiro')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -52,6 +53,7 @@ export default function Dashboard() {
 
       if (profileData) {
         setReceitaTotal(Number(profileData.receita_mensal) || 0);
+        setPerfilFinanceiro(profileData.perfil_financeiro);
       }
 
       // 2. Ralos Invisíveis
@@ -110,9 +112,21 @@ export default function Dashboard() {
             className="h-6 w-auto"
             referrerPolicy="no-referrer"
           />
-          <h2 className="text-2xl font-semibold text-white">Olá, {userName}</h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Olá, {userName}</h2>
+            {perfilFinanceiro && (
+              <div className={cn(
+                "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider mt-1",
+                perfilFinanceiro.includes('Sobrevivência') ? "bg-red-500/10 text-red-500 border border-red-500/20" :
+                perfilFinanceiro.includes('Risco') ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20" :
+                "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+              )}>
+                {perfilFinanceiro}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="w-12 h-12 rounded-full border-2 border-zinc-800 bg-zinc-900 flex items-center justify-center text-yellow-500 font-bold uppercase">
+        <div className="w-12 h-12 rounded-full border-2 border-zinc-800 bg-zinc-900 flex items-center justify-center text-yellow-500 font-bold uppercase shrink-0">
           {userName.charAt(0)}
         </div>
       </header>
