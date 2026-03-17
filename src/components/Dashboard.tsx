@@ -86,9 +86,9 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       setModalType(null);
       setFormData({ nome: '', valor: '', isRalo: false });
       fetchDashboardData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar transação:', error);
-      alert('Erro ao salvar. Verifique se a tabela "transacoes" foi criada no Supabase.');
+      alert(`Erro ao salvar: ${error.message || 'Verifique o console para mais detalhes.'}`);
     } finally {
       setIsSubmitting(false);
     }
