@@ -83,7 +83,7 @@ export default function App() {
 
   return (
     <div className="bg-black min-h-screen text-white font-sans pb-20 selection:bg-yellow-500/30">
-      {activeTab === 'home' && <Dashboard />}
+      {activeTab === 'home' && <Dashboard setActiveTab={setActiveTab} />}
       {activeTab === 'ralos' && <Ralos />}
       {activeTab === 'sonhos' && <Sonhos />}
       {activeTab === 'config' && <Config />}
