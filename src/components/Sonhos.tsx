@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Star, Target, Trash2, TrendingUp, Loader2 } from 'lucide-react';
+import { Star, Target, Trash2, TrendingUp, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { cn } from '../utils/cn';
 
 interface Sonho {
   id: string;
   nome: string;
   valorTotal: number;
+  valorGuardado: number;
   economiaDiaria: number;
 }
 
 export default function Sonhos() {
   // State
-  const [lucroMensal, setLucroMensal] = useState<number>(2900); // Fallback base
+  const [lucroMensal, setLucroMensal] = useState<number>(0);
   const [sonhos, setSonhos] = useState<Sonho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,21 +32,27 @@ export default function Sonhos() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Buscar Receita Mensal para calcular o lucro base
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('receita_mensal')
-        .eq('id', user.id)
-        .maybeSingle();
+      // 1. Buscar Transações para calcular o lucro real
+      const { data: transacoesData, error: transacoesError } = await supabase
+        .from('transacoes')
+        .select('tipo, valor')
+        .eq('user_id', user.id);
 
-      if (profileError) {
-        console.error('Erro ao buscar perfil:', profileError);
+      if (transacoesError) {
+        console.error('Erro ao buscar transações:', transacoesError);
       }
 
-      if (profileData && profileData.receita_mensal) {
-        // Assume 20% of income as default savings capacity for the simulation
-        setLucroMensal(profileData.receita_mensal * 0.2);
+      let lucro = 0;
+      if (transacoesData) {
+        const receitas = transacoesData
+          .filter(t => t.tipo === 'receita')
+          .reduce((acc, curr) => acc + Number(curr.valor), 0);
+        const despesas = transacoesData
+          .filter(t => t.tipo === 'despesa')
+          .reduce((acc, curr) => acc + Number(curr.valor), 0);
+        lucro = receitas - despesas;
       }
+      setLucroMensal(lucro);
 
       // 2. Buscar Sonhos
       const { data: sonhosData, error: sonhosError } = await supabase
@@ -60,6 +68,7 @@ export default function Sonhos() {
           id: item.id.toString(),
           nome: item.nome_sonho,
           valorTotal: Number(item.valor_alvo),
+          valorGuardado: Number(item.valor_guardado || 0),
           economiaDiaria: 0, // Slider starts at 0
         }));
         setSonhos(formattedSonhos);
@@ -95,6 +104,7 @@ export default function Sonhos() {
           { 
             nome_sonho: nome.trim(), 
             valor_alvo: numericValue,
+            valor_guardado: 0,
             user_id: user.id
           }
         ])
@@ -108,6 +118,7 @@ export default function Sonhos() {
           id: data.id.toString(),
           nome: data.nome_sonho,
           valorTotal: Number(data.valor_alvo),
+          valorGuardado: Number(data.valor_guardado || 0),
           economiaDiaria: 0,
         };
         setSonhos([newSonho, ...sonhos]);
@@ -200,16 +211,27 @@ export default function Sonhos() {
 
       {/* Results List */}
       <section className="space-y-6">
+        {!isLoading && sonhos.length === 0 && (
+          <div className="text-center py-12 border border-dashed border-zinc-800 rounded-3xl">
+            <Star className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+            <p className="text-zinc-500 text-sm">Nenhum sonho adicionado ainda.<br/>O que você quer conquistar?</p>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
           </div>
-        ) : sonhos.length > 0 ? (
+        ) : (
           sonhos.map((sonho) => {
-            const tempoBase = lucroMensal > 0 ? Math.ceil(sonho.valorTotal / lucroMensal) : Infinity;
-            const novoLucro = lucroMensal + (sonho.economiaDiaria * 30);
-            const novoTempo = novoLucro > 0 ? Math.ceil(sonho.valorTotal / novoLucro) : Infinity;
+            const valorRestante = Math.max(0, sonho.valorTotal - sonho.valorGuardado);
+            const tempoBase = lucroMensal > 0 ? Math.ceil(valorRestante / lucroMensal) : Infinity;
+            
+            const economiaExtraMensal = sonho.economiaDiaria * 30;
+            const novoLucro = lucroMensal + economiaExtraMensal;
+            const novoTempo = novoLucro > 0 ? Math.ceil(valorRestante / novoLucro) : Infinity;
             const mesesAntecipados = tempoBase !== Infinity && novoTempo !== Infinity ? tempoBase - novoTempo : 0;
+            const percentualConcluido = Math.min(100, Math.round((sonho.valorGuardado / sonho.valorTotal) * 100)) || 0;
 
             return (
               <div 
@@ -235,74 +257,81 @@ export default function Sonhos() {
                   </button>
                 </div>
 
-                {/* Progress Bar (Starts at 0%) */}
+                {/* Progress Bar */}
                 <div className="space-y-2 mb-6">
                   <div className="flex justify-between text-xs">
-                    <span className="text-yellow-500 font-medium">0% Concluído</span>
-                    <span className="text-zinc-500">R$ 0,00 guardados</span>
+                    <span className="text-yellow-500 font-medium">{percentualConcluido}% Concluído</span>
+                    <span className="text-zinc-500">{formatCurrency(sonho.valorGuardado)} guardados</span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 border border-zinc-800/50 rounded-full overflow-hidden">
-                    <div className="h-full bg-yellow-500 rounded-full w-0"></div>
+                    <div className="h-full bg-yellow-500 rounded-full transition-all duration-500" style={{ width: `${percentualConcluido}%` }}></div>
                   </div>
-                  <p className="text-sm text-zinc-400 pt-2">
-                    Com sua capacidade de poupança atual, você conquista isso em <strong className="text-white">{tempoBase} meses</strong>.
-                  </p>
                 </div>
 
-                {/* The Magic: Rule of R$ 3 Slider */}
-                <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-400">
-                      E se você cortar gastos diários? <br/>
-                      <span className="text-yellow-500/80">(A Regra dos R$ 3)</span>
-                    </label>
-                    <span className="text-lg font-bold text-white">
-                      {formatCurrency(sonho.economiaDiaria)}<span className="text-xs text-zinc-500 font-normal">/dia</span>
-                    </span>
+                {lucroMensal <= 0 ? (
+                  <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start space-x-3">
+                    <span className="text-red-500 text-lg shrink-0">⚠️</span>
+                    <p className="text-red-400 text-sm leading-relaxed">
+                      Seu orçamento está no limite ou no vermelho. Para projetar a conquista deste sonho, você precisa caçar Ralos Invisíveis e gerar lucro mensal primeiro.
+                    </p>
                   </div>
-                  
-                  <input
-                    type="range"
-                    min="0"
-                    max="30"
-                    step="1"
-                    value={sonho.economiaDiaria}
-                    onChange={(e) => handleSliderChange(sonho.id, parseInt(e.target.value))}
-                    className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-                  />
-                  
-                  <div className="flex justify-between text-[10px] text-zinc-500 px-1">
-                    <span>R$ 0</span>
-                    <span>R$ 15</span>
-                    <span>R$ 30</span>
-                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-zinc-400 mb-6">
+                      Com sua capacidade de poupança atual ({formatCurrency(lucroMensal)}), você conquista isso em <strong className="text-white">{tempoBase} meses</strong>.
+                    </p>
 
-                  {/* Dynamic Impact Text */}
-                  {sonho.economiaDiaria > 0 && mesesAntecipados > 0 && (
-                    <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-start space-x-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                      <p className="text-emerald-400 text-sm leading-relaxed">
-                        Economizando mais <strong className="font-bold">{formatCurrency(sonho.economiaDiaria)}/dia</strong>, você antecipa seu sonho em <strong className="font-bold text-emerald-300">{mesesAntecipados} meses</strong>!
-                      </p>
+                    {/* The Magic: Rule of R$ 3 Slider */}
+                    <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-zinc-400">
+                          E se você cortar gastos diários? <br/>
+                          <span className="text-yellow-500/80">(A Regra dos R$ 3)</span>
+                        </label>
+                        <span className="text-lg font-bold text-white">
+                          {formatCurrency(sonho.economiaDiaria)}<span className="text-xs text-zinc-500 font-normal">/dia</span>
+                        </span>
+                      </div>
+                      
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        step="1"
+                        value={sonho.economiaDiaria}
+                        onChange={(e) => handleSliderChange(sonho.id, parseInt(e.target.value))}
+                        className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                      />
+                      
+                      <div className="flex justify-between text-[10px] text-zinc-500 px-1">
+                        <span>R$ 0</span>
+                        <span>R$ 15</span>
+                        <span>R$ 30</span>
+                      </div>
+
+                      {/* Dynamic Impact Text */}
+                      {sonho.economiaDiaria > 0 && mesesAntecipados > 0 && (
+                        <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-start space-x-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                          <p className="text-emerald-400 text-sm leading-relaxed">
+                            Economizando mais <strong className="font-bold">{formatCurrency(sonho.economiaDiaria)}/dia</strong>, você antecipa seu sonho em <strong className="font-bold text-emerald-300">{mesesAntecipados} meses</strong>!
+                          </p>
+                        </div>
+                      )}
+                      {sonho.economiaDiaria > 0 && mesesAntecipados === 0 && (
+                        <div className="mt-4 bg-zinc-800/30 border border-zinc-700/50 rounded-xl p-3 flex items-start space-x-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <TrendingUp className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+                          <p className="text-zinc-400 text-sm leading-relaxed">
+                            Economizando mais <strong className="font-bold">{formatCurrency(sonho.economiaDiaria)}/dia</strong>, você acelera a conquista, mas ainda leva <strong className="font-bold text-zinc-300">{novoTempo} meses</strong>.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {sonho.economiaDiaria > 0 && mesesAntecipados === 0 && (
-                    <div className="mt-4 bg-zinc-800/30 border border-zinc-700/50 rounded-xl p-3 flex items-start space-x-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <TrendingUp className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
-                      <p className="text-zinc-400 text-sm leading-relaxed">
-                        Economizando mais <strong className="font-bold">{formatCurrency(sonho.economiaDiaria)}/dia</strong>, você acelera a conquista, mas ainda leva <strong className="font-bold text-zinc-300">{novoTempo} meses</strong>.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             );
           })
-        ) : (
-          <div className="text-center py-12 border border-dashed border-zinc-800 rounded-3xl">
-            <Star className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">Nenhum sonho adicionado ainda.<br/>O que você quer conquistar?</p>
-          </div>
         )}
       </section>
     </div>
